@@ -65,10 +65,10 @@ for name, hub_path in model_names.items():
     models[name] = model
 
     # Create image transformation pipeline based on model configuration
-    transforms[name] = create_transform(**resolve_data_config(model=model))
+    transforms[name] = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
 
 # === 2. Load input image ===
-image = Image.open("/path/to/your/image.png").convert("RGB")
+image = Image.open("/path/to/your/image.png")
 
 # === 3. Extract embeddings for each model ===
 embeddings = {}
