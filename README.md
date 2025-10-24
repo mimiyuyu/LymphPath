@@ -1,4 +1,4 @@
-#  Pan-cancer outcome prediction via a unified weakly supervised deep learning model
+#  A unified foundation model framework for pancancer lymph-node metastasis detection
 
 
 ## Pre-requisites
@@ -38,32 +38,61 @@ Preprocess the slides following [CLAM](https://github.com/mahmoodlab/CLAM), incl
    - [UNI model weights](https://huggingface.co/MahmoodLab/UNI), put it to *./weights/* and load the model
    - [Virchow2 model weights](https://huggingface.co/paige-ai/Virchow2), put it to *./weights/* and load the model
 ```python
-import timm
 import torch
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
-from timm.layers import SwiGLUPacked
 from PIL import Image
+from timm.data import resolve_data_config, create_transform
+from timm.layers import SwiGLUPacked
+import timm
 
-# need to specify MLP layer and activation function for proper init
-model = timm.create_model("hf-hub:paige-ai/Virchow2", pretrained=True, mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU)
-model = model.eval()
+# === 1. Create three pretrained models from Hugging Face Hub ===
+model_names = {
+    "gigapath": "hf-hub:prov-gigapath/prov-gigapath",
+    "uni": "hf-hub:MahmoodLab/UNI",
+    "virchow2": "hf-hub:paige-ai/Virchow2"
+}
 
-transforms = create_transform(**resolve_data_config(model.pretrained_cfg, model=model))
-```
+models = {}
+transforms = {}
 
-2. Use Virchow2 to extract image embeddings
-```python
-image = Image.open("/path/to/your/image.png")
-image = transforms(image).unsqueeze(0)  # size: 1 x 3 x 224 x 224
+for name, hub_path in model_names.items():
+    # Create model and set to evaluation mode
+    model = timm.create_model(
+        hub_path,
+        pretrained=True,
+        mlp_layer=SwiGLUPacked,
+        act_layer=torch.nn.SiLU
+    ).eval()
+    models[name] = model
 
-output = model(image)  # size: 1 x 261 x 1280
+    # Create image transformation pipeline based on model configuration
+    transforms[name] = create_transform(**resolve_data_config(model=model))
 
-class_token = output[:, 0]    # size: 1 x 1280
-patch_tokens = output[:, 5:]  # size: 1 x 256 x 1280, tokens 1-4 are register tokens so we ignore those
+# === 2. Load input image ===
+image = Image.open("/path/to/your/image.png").convert("RGB")
 
-# concatenate class token and average pool of patch tokens
-embedding = torch.cat([class_token, patch_tokens.mean(1)], dim=-1)  # size: 1 x 2560
+# === 3. Extract embeddings for each model ===
+embeddings = {}
+
+for name, model in models.items():
+    transform = transforms[name]
+    x = transform(image).unsqueeze(0)  # shape: 1 x 3 x 224 x 224
+
+    with torch.no_grad():
+        output = model(x)  # e.g., shape: 1 x 261 x 1280 (for Virchow2)
+
+    # Extract the class token
+    class_token = output[:, 0]  # shape: 1 x hidden_dim
+
+    # Skip the first 4 register tokens and keep the patch tokens
+    patch_tokens = output[:, 5:]  # shape: 1 x 256 x hidden_dim
+
+    # Concatenate the class token with the mean-pooled patch tokens
+    embedding = torch.cat(
+        [class_token, patch_tokens.mean(1)],
+        dim=-1
+    )  # shape: 1 x (2 * hidden_dim)
+
+    embeddings[name] = embedding
 ```
 
 ## Basic Usage: Predict Patient Risk with ProgPath
