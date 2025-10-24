@@ -25,7 +25,7 @@ pip install -r requirements.txt
 ```
 
 ## Model Download
-The ProgPath model can be accessed from [here](https://drive.google.com/file/d/1Qqgl1HwP8W2_unsBNRvcF9XAxjIy6KVf/view?usp=sharing)
+The LymphPath model can be accessed from [here](xxx)
 
 ## Image Processing Pipeline
 
@@ -33,7 +33,10 @@ The ProgPath model can be accessed from [here](https://drive.google.com/file/d/1
 Preprocess the slides following [CLAM](https://github.com/mahmoodlab/CLAM), including foreground tissue segmentation and stitching. 
 
 ### Extract Image Feature Embeddings
-1. Download the pretrained [Virchow2 model weights](https://huggingface.co/paige-ai/Virchow2), put it to *./weights/* and load the model
+1. Download the pretrained
+   - [GigaPath model weights](https://huggingface.co/prov-gigapath/prov-gigapath), put it to *./weights/* and load the model
+   - [UNI model weights](https://huggingface.co/MahmoodLab/UNI), put it to *./weights/* and load the model
+   - [Virchow2 model weights](https://huggingface.co/paige-ai/Virchow2), put it to *./weights/* and load the model
 ```python
 import timm
 import torch
