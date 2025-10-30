@@ -348,7 +348,7 @@ args:
 
 class LymphPath(nn.Module):
     def __init__(self, gate=True, ifkan=False, size_arg1="gigapath", size_arg2="uni", size_arg3="virchow2", dropout=True, k_sample=3, n_classes=2,
-                 instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, **kwargs):
+                 instance_loss_fn=nn.CrossEntropyLoss(), loss1=0.4, mergeloss=0.6, subtyping=False, **kwargs):
         super(LymphPath, self).__init__()
         self.size_dict = {'xs': [384, 256, 256], 's': [512, 256, 256], "small": [768, 512, 256], "uni": [1024, 512, 384], 'gigapath': [1536, 768, 512], 'large': [2048, 1024, 512], 'virchow2':[2560, 1280, 512]}
         size1 = self.size_dict[size_arg1]
@@ -402,6 +402,8 @@ class LymphPath(nn.Module):
         self.instance_loss_fn = instance_loss_fn
         self.n_classes = n_classes
         self.subtyping = subtyping
+        self.loss1 = loss1
+        self.mergeloss = mergeloss
 
         self.fusion_mlp = nn.Sequential(  
             nn.Linear(3 * self.n_classes, 512),  
@@ -558,11 +560,13 @@ class LymphPath(nn.Module):
         logits2 = self.classifiers2(M2)  
         logits3 = self.classifiers3(M3) 
         combined_logits = torch.cat([logits1, logits2, logits3], dim=1)  
-
         final_logits = self.fusion_mlp(combined_logits)  
 
-        Y_hat = torch.topk(final_logits, 1, dim=1)[1]
-        Y_prob = F.softmax(final_logits, dim=1)
+        y_prob1 = torch.softmax(logits1, dim=-1)
+        y_prob2 = torch.softmax(logits2, dim=-1)
+        y_prob3 = torch.softmax(logits3, dim=-1)
+        y_prob_merge = torch.softmax(final_logits, dim=-1)
+        y_prob = self.loss1 * (y_prob1 + y_prob2 + y_prob3) / 3 + self.mergeloss * y_prob_merge
 
         result = {
             'logits1': logits1,
@@ -574,7 +578,8 @@ class LymphPath(nn.Module):
             'attention_raw3': A3_raw,
             'M1': M1,
             'M2': M2,
-            'M3': M3
+            'M3': M3,
+            'y_prob': y_prob
         }
 
         if instance_eval:
