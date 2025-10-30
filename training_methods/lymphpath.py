@@ -29,19 +29,13 @@ def evaluation(model, loader, result_dir, cfg):
                 logits3 = result['logits3']
                 bag_logits_merge = result['merge_logits']
 
-                y_prob1 = torch.softmax(logits1, dim=-1)
-                y_prob2 = torch.softmax(logits2, dim=-1)
-                y_prob3 = torch.softmax(logits3, dim=-1)
-                y_prob_merge = torch.softmax(bag_logits_merge, dim=-1)
-
                 loss1 = loss_fn(logits1, y)
                 loss2 = loss_fn(logits2, y)
                 loss3 = loss_fn(logits3, y)
                 merge_loss = loss_fn(bag_logits_merge, y)
                 loss = cfg.Model.loss1 * (loss1 + loss2 + loss3) / 3 + cfg.Model.mergeloss * merge_loss
 
-                y_prob = cfg.Model.loss1 * (y_prob1 + y_prob2 + y_prob3) / 3 + cfg.Model.mergeloss * y_prob_merge
-
+                y_prob = result['y_prob']
                 probs.append(y_prob)
                 labels.append(y)
 
