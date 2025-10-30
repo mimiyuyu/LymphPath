@@ -100,7 +100,7 @@ model = load_model(cfg)
 model.load_state_dict(torch.load('weights/LymphPath.pt'), strict=True)
 ```
 
-2. Load your image
+2. Lymph-Node Metastasis Detection
 ```python
 import pandas as pd
 import random
@@ -125,32 +125,15 @@ dataset = ThreeChannelBagDataset(
 )
 
 sample = dataset[0]
-feature1 = sample['features1']  
-feature2 = sample['features2']
-feature3 = sample['features3']
-y = sample['label']
-```
-
-3. Lymph-Node Metastasis Detection
-```python
 model.eval()
 model.to('cuda')
-feature1 = feature1.to('cuda')
-feature2 = feature2.to('cuda')
-feature3 = feature3.to('cuda')
-y =y .to('cuda')
+feature1 = sample['features1'].to('cuda')
+feature2 = sample['features2'].to('cuda')
+feature3 = sample['features3'].to('cuda')
+y = sample['label'].to('cuda')
+
 res = model(feature1, feature2, feature3, label=y, instance_eval=True)
-
-logits1 = res['logits1']
-logits2 = res['logits2']
-logits3 = res['logits3']
-bag_logits_merge = res['merge_logits']
-
-y_prob1 = torch.softmax(logits1, dim=-1)
-y_prob2 = torch.softmax(logits2, dim=-1)
-y_prob3 = torch.softmax(logits3, dim=-1)
-y_prob_merge = torch.softmax(bag_logits_merge, dim=-1)
-y_prob = 0.4 * (y_prob1 + y_prob2 + y_prob3) / 3 + 0.6 * y_prob_merge
+y_prob = res['y_prob']
 print('slide id:', str(wsi_id), 'if LNM:', int(y_prob[:,1] > 0.5))
 ```
 
