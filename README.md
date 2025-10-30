@@ -171,9 +171,6 @@ AUC:0.9905     AUPRC:0.977659
 
 ## Acknowledgements
 The project was built on many amazing repositories: [GigaPath](https://huggingface.co/prov-gigapath/prov-gigapath), [UNI](https://huggingface.co/MahmoodLab/UNI), [Virchow2](https://huggingface.co/paige-ai/Virchow2), and [CLAM](https://github.com/mahmoodlab/CLAM). We thank the authors and developers for their contributions.
- 
-## Issue
-Please open new threads or address questions to zhang_jiayu@stu.scu.edu.cn or xiyue.wang.scu@gmail.com
 
 ## License
 
