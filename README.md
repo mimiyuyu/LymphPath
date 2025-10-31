@@ -139,17 +139,17 @@ print('slide id:', str(wsi_id), 'if LNM:', int(y_prob[:,1] > 0.5))
 
 ## Evaluation 
 
-To reproduce the results in our paper, we provide a reproducible result on [17-BRCA](https://camelyon17.grand-challenge.org/Data/) dataset.
+To reproduce the results in our paper, we provide a reproducible result on [17-BRCA](https://camelyon17.grand-challenge.org/Data/) and [SLN-BRCA](https://www.nature.com/articles/s41591-019-0508-1#data-availability)dataset.
 Please refer to `demo.ipynb` for a demonstration. 
-* First download our processed 17-BRCA frozen features [here](xxx)
+* First download our processed 17-BRCA frozen features [here](https://pan.baidu.com/s/1kCH6WLAlHizFo4Oii_ahpw?pwd=urqv) and SLN-BRCA frozen features[here](https://pan.baidu.com/s/15D1hSRvx2DoVTuAMLV45nQ?pwd=4xfx)
 * Put the extracted features to *./features/* 
 * Run the following command:
 ```shell
 python3 eval.py --config_path projects/configs/cfg_LymphPath.yaml
 ```
-The AUC and AUPRC metrics for this cohort will be stored at `./projects/result/17-BRCA/`.
+The AUC and AUPRC metrics for this cohort will be stored at `./projects/result/17-BRCA/` and `./projects/result/SLN-BRCA/`
 ```
-AUC:0.9905     AUPRC:0.977659
+17-BRCA: AUC:0.9905 AUPRC:0.9777; SLN-BRCA: AUC: AUPRC:
 ```
 
 ## Acknowledgements
