@@ -149,7 +149,7 @@ python3 eval.py --config_path projects/configs/cfg_LymphPath.yaml
 ```
 The AUC and AUPRC metrics for this cohort will be stored at `./projects/result/17-BRCA/` and `./projects/result/SLN-BRCA/`
 ```
-17-BRCA: AUC:0.9905 AUPRC:0.9777; SLN-BRCA: AUC: AUPRC:
+17-BRCA: AUC:0.9905 AUPRC:0.9777; SLN-BRCA: AUC:0.974 AUPRC:0.9148
 ```
 
 ## Acknowledgements
