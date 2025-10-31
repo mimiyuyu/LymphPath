@@ -5,6 +5,7 @@ Data:
     n_classes: 2
     dataset_name: ThreeStreamBagDataset
     dataset_test: ./csv/17-BRCA.csv
+    # dataset_test: ./csv/SLN-BRCA.csv
     data_dir1: ./feature/gigapath/
     data_dir2: ./feature/UNI/
     data_dir3: ./feature/virchow2/
