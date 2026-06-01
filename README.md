@@ -169,9 +169,8 @@ CUDA_VISIBLE_DEVICES=0 python3 train.py --config_path /path/to/your/config.yaml 
 ```
 
 Make sure to adjust the configuration file (model architecture, data paths, hyperparameters, etc.) according to your needs. For multi‑GPU training, you can use `CUDA_VISIBLE_DEVICES=0,1,2,3`.
-```
-Note: Training requires pre‑extracted features from GigaPath, UNI, and Virchow2 as described in the Image Processing Pipeline section.
-```
+
+`Note: Training requires pre‑extracted features from GigaPath, UNI, and Virchow2 as described in the Image Processing Pipeline section.`
 
 ## Acknowledgements
 The project was built on many amazing repositories: [GigaPath](https://huggingface.co/prov-gigapath/prov-gigapath), [UNI](https://huggingface.co/MahmoodLab/UNI), [Virchow2](https://huggingface.co/paige-ai/Virchow2), and [CLAM](https://github.com/mahmoodlab/CLAM). We thank the authors and developers for their contributions.
