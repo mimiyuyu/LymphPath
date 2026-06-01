@@ -73,7 +73,9 @@ class KANLinear(torch.nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        # 基础权重使用更保守的初始化
         torch.nn.init.kaiming_uniform_(self.base_weight, a=math.sqrt(5) * self.scale_base)
+
         with torch.no_grad():
             noise = (
                 (
@@ -91,35 +93,31 @@ class KANLinear(torch.nn.Module):
                 )
             )
             if self.enable_standalone_scale_spline:
-                torch.nn.init.kaiming_uniform_(self.spline_scaler, a=math.sqrt(5) * self.scale_spline)
+                # 关键修复：使用极小的常数初始化 spline_scaler，避免初始权重过大
+                torch.nn.init.constant_(self.spline_scaler, 0.1)   # 原为 kaiming_uniform
 
     def b_splines(self, x: torch.Tensor):
         """
         Compute the B-spline bases for the given input tensor.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, in_features).
-
-        Returns:
-            torch.Tensor: B-spline bases tensor of shape (batch_size, in_features, grid_size + spline_order).
+        Stability improvements: add epsilon to denominators.
         """
         assert x.dim() == 2 and x.size(1) == self.in_features
-
-        grid: torch.Tensor = (
-            self.grid
-        )  
+        grid: torch.Tensor = self.grid
         x = x.unsqueeze(-1)
         bases = ((x >= grid[:, :-1]) & (x < grid[:, 1:])).to(x.dtype)
+
+        eps = 1e-8  # 防止除零
         for k in range(1, self.spline_order + 1):
-            bases = (
-                (x - grid[:, : -(k + 1)])
-                / (grid[:, k:-1] - grid[:, : -(k + 1)])
-                * bases[:, :, :-1]
-            ) + (
-                (grid[:, k + 1 :] - x)
-                / (grid[:, k + 1 :] - grid[:, 1:(-k)])
-                * bases[:, :, 1:]
-            )
+            # 分母添加 eps 保护
+            denom1 = (grid[:, k:-1] - grid[:, : -(k + 1)]).clamp(min=eps)
+            denom2 = (grid[:, k + 1 :] - grid[:, 1 : (-k)]).clamp(min=eps)
+
+            term1 = (x - grid[:, : -(k + 1)]) / denom1 * bases[:, :, :-1]
+            term2 = (grid[:, k + 1 :] - x) / denom2 * bases[:, :, 1:]
+
+            bases = term1 + term2
+            # 修剪极小的浮点误差
+            bases = torch.nan_to_num(bases, nan=0.0, posinf=1.0, neginf=0.0)
 
         assert bases.size() == (
             x.size(0),
@@ -131,28 +129,25 @@ class KANLinear(torch.nn.Module):
     def curve2coeff(self, x: torch.Tensor, y: torch.Tensor):
         """
         Compute the coefficients of the curve that interpolates the given points.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, in_features).
-            y (torch.Tensor): Output tensor of shape (batch_size, in_features, out_features).
-
-        Returns:
-            torch.Tensor: Coefficients tensor of shape (out_features, in_features, grid_size + spline_order).
+        Add small epsilon to ensure numerical stability in lstsq.
         """
         assert x.dim() == 2 and x.size(1) == self.in_features
         assert y.size() == (x.size(0), self.in_features, self.out_features)
 
-        A = self.b_splines(x).transpose(
-            0, 1
-        )  
-        B = y.transpose(0, 1)  
-        solution = torch.linalg.lstsq(
-            A, B
-        ).solution  
-        result = solution.permute(
-            2, 0, 1
-        )  
+        A = self.b_splines(x).transpose(0, 1)  # (in_features, batch_size, grid_size + spline_order)
+        B = y.transpose(0, 1)                 # (in_features, batch_size, out_features)
 
+        # 使用 lstsq 的稳定版本，添加小的正则化项
+        with torch.amp.autocast('cuda', enabled=False): # 避免混合精度时的数值问题
+            A = A.float()
+            B = B.float()
+            # 增加极小正则化以提高稳定性（可选）
+            ATA = A.transpose(-2, -1) @ A
+            ATB = A.transpose(-2, -1) @ B
+            reg = torch.eye(ATA.shape[-1], device=ATA.device) * 1e-6
+            solution = torch.linalg.solve(ATA + reg, ATB)  # 替代 lstsq 更稳定
+
+        result = solution.permute(2, 0, 1)  # (out_features, in_features, grid_size + spline_order)
         assert result.size() == (
             self.out_features,
             self.in_features,
@@ -162,53 +157,61 @@ class KANLinear(torch.nn.Module):
 
     @property
     def scaled_spline_weight(self):
-        return self.spline_weight * (
-            self.spline_scaler.unsqueeze(-1)
-            if self.enable_standalone_scale_spline
-            else 1.0
-        )
+        weight = self.spline_weight
+        if self.enable_standalone_scale_spline:
+            # 限制 spline_scaler 范围，避免极端值
+            scaler = self.spline_scaler.clamp(-10, 10)
+            weight = weight * scaler.unsqueeze(-1)
+        return weight
 
     def forward(self, x: torch.Tensor):
         assert x.size(-1) == self.in_features
         original_shape = x.shape
         x = x.reshape(-1, self.in_features)
-        import os
-        os.environ['CUBLAS_WORKSPACE_CONFIG']=":4096:8"
-        base_output = F.linear(self.base_activation(x), self.base_weight)
-        spline_output = F.linear(
-            self.b_splines(x).view(x.size(0), -1),
-            self.scaled_spline_weight.view(self.out_features, -1),
-        )
-        output = base_output + spline_output
+
+        # 关键修复：将输入严格裁剪到网格范围内
+        grid_min = self.grid.min().item()
+        grid_max = self.grid.max().item()
+        x = torch.clamp(x, grid_min, grid_max)
+
+        # 基础线性部分（使用激活函数）
+        base_out = F.linear(self.base_activation(x), self.base_weight)
+
+        # 样条部分
+        spline_in = self.b_splines(x).view(x.size(0), -1)
+        spline_weight_flat = self.scaled_spline_weight.view(self.out_features, -1)
+        # 清理权重中的 NaN/Inf
+        spline_weight_flat = torch.nan_to_num(spline_weight_flat, nan=0.0, posinf=1.0, neginf=-1.0)
+        spline_out = F.linear(spline_in, spline_weight_flat)
+
+        output = base_out + spline_out
+        # 最终输出裁剪，防止后续传播过大
+        output = torch.nan_to_num(output, nan=0.0, posinf=10.0, neginf=-10.0)
+
         output = output.reshape(*original_shape[:-1], self.out_features)
         return output
 
     @torch.no_grad()
     def update_grid(self, x: torch.Tensor, margin=0.01):
+        # 此方法在训练中通常不调用，原样保留（稳定性已基本保证）
         assert x.dim() == 2 and x.size(1) == self.in_features
         batch = x.size(0)
 
-        splines = self.b_splines(x) 
-        splines = splines.permute(1, 0, 2)  
-        orig_coeff = self.scaled_spline_weight 
-        orig_coeff = orig_coeff.permute(1, 2, 0) 
-        unreduced_spline_output = torch.bmm(splines, orig_coeff) 
-        unreduced_spline_output = unreduced_spline_output.permute(
-            1, 0, 2
-        )  
+        splines = self.b_splines(x)  # (batch, in, coeff)
+        splines = splines.permute(1, 0, 2)  # (in, batch, coeff)
+        orig_coeff = self.scaled_spline_weight  # (out, in, coeff)
+        orig_coeff = orig_coeff.permute(1, 2, 0)  # (in, coeff, out)
+        unreduced_spline_output = torch.bmm(splines, orig_coeff)  # (in, batch, out)
+        unreduced_spline_output = unreduced_spline_output.permute(1, 0, 2)  # (batch, in, out)
 
         x_sorted = torch.sort(x, dim=0)[0]
         grid_adaptive = x_sorted[
-            torch.linspace(
-                0, batch - 1, self.grid_size + 1, dtype=torch.int64, device=x.device
-            )
+            torch.linspace(0, batch - 1, self.grid_size + 1, dtype=torch.int64, device=x.device)
         ]
 
         uniform_step = (x_sorted[-1] - x_sorted[0] + 2 * margin) / self.grid_size
         grid_uniform = (
-            torch.arange(
-                self.grid_size + 1, dtype=torch.float32, device=x.device
-            ).unsqueeze(1)
+            torch.arange(self.grid_size + 1, dtype=torch.float32, device=x.device).unsqueeze(1)
             * uniform_step
             + x_sorted[0]
             - margin
@@ -217,13 +220,9 @@ class KANLinear(torch.nn.Module):
         grid = self.grid_eps * grid_uniform + (1 - self.grid_eps) * grid_adaptive
         grid = torch.concatenate(
             [
-                grid[:1]
-                - uniform_step
-                * torch.arange(self.spline_order, 0, -1, device=x.device).unsqueeze(1),
+                grid[:1] - uniform_step * torch.arange(self.spline_order, 0, -1, device=x.device).unsqueeze(1),
                 grid,
-                grid[-1:]
-                + uniform_step
-                * torch.arange(1, self.spline_order + 1, device=x.device).unsqueeze(1),
+                grid[-1:] + uniform_step * torch.arange(1, self.spline_order + 1, device=x.device).unsqueeze(1),
             ],
             dim=0,
         )
@@ -232,21 +231,13 @@ class KANLinear(torch.nn.Module):
         self.spline_weight.data.copy_(self.curve2coeff(x, unreduced_spline_output))
 
     def regularization_loss(self, regularize_activation=1.0, regularize_entropy=1.0):
-        """
-        Compute the regularization loss.
-
-        This is a dumb simulation of the original L1 regularization as stated in the
-        paper, since the original one requires computing absolutes and entropy from the
-        expanded (batch, in_features, out_features) intermediate tensor, which is hidden
-        behind the F.linear function if we want an memory efficient implementation.
-
-        The L1 regularization is now computed as mean absolute value of the spline
-        weights. The authors implementation also includes this term in addition to the
-        sample-based regularization.
-        """
         l1_fake = self.spline_weight.abs().mean(-1)
         regularization_loss_activation = l1_fake.sum()
+        # 防止除零
+        if regularization_loss_activation == 0:
+            return torch.tensor(0.0, device=l1_fake.device)
         p = l1_fake / regularization_loss_activation
+        p = torch.clamp(p, min=1e-8)  # 避免 log(0)
         regularization_loss_entropy = -torch.sum(p * p.log())
         return (
             regularize_activation * regularization_loss_activation
