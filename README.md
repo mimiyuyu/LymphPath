@@ -159,8 +159,6 @@ python3 eval.py --config_path projects/configs/cfg_LymphPath_SLN-BRCA.yaml
 
 To train the LymphPath model on your own dataset or reproduce the training process, use the `train.py` script.
 
-### Example command
-
 ```shell
 CUDA_VISIBLE_DEVICES=0 python3 train.py --config_path /path/to/your/config.yaml --set_seed --begin 0 --end 1
 ```
