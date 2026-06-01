@@ -163,14 +163,17 @@ To train the LymphPath model on your own dataset or reproduce the training proce
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python3 train.py --config_path /path/to/your/config.yaml --set_seed --begin 0 --end 1
-
+```
+```
 --config_path: Path to the configuration YAML file.
 --set_seed: Fix random seed for reproducibility.
 --begin / --end: Specify the fold range for cross‑validation (if applicable).
+```
 
-Make sure to adjust the configuration file (model architecture, data paths, hyperparameters, etc.) according to your needs. For multi‑GPU training, you can use CUDA_VISIBLE_DEVICES=0,1,2,3.
-
+Make sure to adjust the configuration file (model architecture, data paths, hyperparameters, etc.) according to your needs. For multi‑GPU training, you can use `CUDA_VISIBLE_DEVICES=0,1,2,3`.
+```
 Note: Training requires pre‑extracted features from GigaPath, UNI, and Virchow2 as described in the Image Processing Pipeline section.
+```
 
 ## Acknowledgements
 The project was built on many amazing repositories: [GigaPath](https://huggingface.co/prov-gigapath/prov-gigapath), [UNI](https://huggingface.co/MahmoodLab/UNI), [Virchow2](https://huggingface.co/paige-ai/Virchow2), and [CLAM](https://github.com/mahmoodlab/CLAM). We thank the authors and developers for their contributions.
