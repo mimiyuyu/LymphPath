@@ -1,0 +1,14 @@
+# For Blackwell GPUs (sm_120), install PyTorch separately first:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+numpy>=1.22.3
+pandas
+scikit-learn
+tqdm
+PyYAML==5.3.1
+addict
+tensorboardX
+exhaustive_weighted_random_sampler
+kan
+timm==0.9.11
+Pillow
+einops
