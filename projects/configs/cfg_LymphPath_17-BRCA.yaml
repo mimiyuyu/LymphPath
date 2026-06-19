@@ -1,0 +1,47 @@
+General:
+    result_dir: ./projects/result
+    fold_num: 1
+    seed: 326
+    exp_type: repeat
+    
+Data:
+    n_classes: 2
+    dataset_name: ThreeStreamBagDataset
+    dataset:
+        test_set:
+            csv_path: ./csv/17-BRCA.csv
+    data_dir1: ./LymphPath_feature/17-BRCA/Gigapath/
+    data_dir2: ./LymphPath_feature/17-BRCA/UNI/
+    data_dir3: ./LymphPath_feature/17-BRCA/Virchow2/
+
+Model:
+    model_type: stable
+    model_name: LymphPath
+    size_arg1: gigapath
+    size_arg2: uni
+    size_arg3: virchow2
+    logits_field: bag_logits
+    loss1: 0.4
+    mergeloss: 0.6
+    ifkan: True
+    
+Train:
+    optimizer: AdamW
+    reg: 1.0e-5
+    lr: 3.0e-4
+    max_epochs: 100
+    train_function: lymphpath_train
+    val_function: lymphpath
+    CosineAnnealingLR:
+        T_max: 50
+        eta_min: 1.0e-6
+    Early_stopping:
+        type: auc
+        patient: 10
+        stop_epoch: 30
+    batch_size : 256
+    num_worker: 16
+    is_augment: True
+    balance: True
+
+# python3 eval.py --config_path projects/configs/cfg_LymphPath_17-BRCA.yaml
