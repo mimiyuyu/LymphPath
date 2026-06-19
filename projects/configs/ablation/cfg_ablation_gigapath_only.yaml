@@ -1,0 +1,48 @@
+General:
+    result_dir: ./projects/result
+    fold_num: 1
+    seed: 326
+    exp_type: repeat
+
+Data:
+    n_classes: 2
+    dataset_name: ThreeStreamBagDataset
+    active_streams: [1, 0, 0]
+    dataset:
+        train_set:
+            csv_path: ./csv/train.csv
+        val_set:
+            csv_path: ./csv/val.csv
+    data_dir1: ./LymphPath_feature/train/Gigapath/
+    data_dir2: ./LymphPath_feature/train/UNI/
+    data_dir3: ./LymphPath_feature/train/Virchow2/
+
+Model:
+    model_type: stable
+    model_name: LymphPath
+    size_arg1: gigapath
+    size_arg2: uni
+    size_arg3: virchow2
+    logits_field: bag_logits
+    loss1: 1.0
+    mergeloss: 0.0
+    ifkan: True
+
+Train:
+    optimizer: AdamW
+    reg: 1.0e-5
+    lr: 3.0e-4
+    max_epochs: 100
+    train_function: lymphpath_train
+    val_function: lymphpath
+    CosineAnnealingLR:
+        T_max: 50
+        eta_min: 1.0e-6
+    Early_stopping:
+        type: auc
+        patient: 10
+        stop_epoch: 30
+    batch_size: 256
+    num_worker: 16
+    is_augment: True
+    balance: True

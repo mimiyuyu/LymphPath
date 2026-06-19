@@ -1,0 +1,24 @@
+General:
+    result_dir: ./projects/result
+    fold_num: 1
+    seed: 79
+    exp_type: repeat
+
+Data:
+    n_classes: 2
+    dataset_name: BagDataset
+    data_dir: ./LymphPath_feature/17-BRCA/Gigapath/
+    dataset:
+        test_set:
+            csv_path: ./csv/17-BRCA.csv
+
+Model:
+    model_type: stable
+    model_name: CLAM_SB
+    size_arg: big_pro
+    logits_field: bag_logits
+    ifkan: True
+
+Train:
+    val_function: classification_single
+    num_worker: 8
