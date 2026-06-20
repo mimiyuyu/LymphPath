@@ -106,7 +106,7 @@ Preprocess the slides following [CLAM](https://github.com/mahmoodlab/CLAM), incl
 
 ## Model Download
 
-The pretrained LymphPath checkpoint can be accessed from [here](https://drive.google.com/file/d/1kGgYxj0dwkDT_EUqLGmu0v5BcXjTACNX/view).
+The pretrained LymphPath checkpoint can be accessed from [here](https://drive.google.com/file/d/1P8CgH3g-zP6OZAXXsAUo3xknn0ckQKgC/view?usp=sharing).
 
 Put it to:
 ```text
@@ -212,8 +212,8 @@ Each folder contains:
 
 Reference results:
 ```text
-17-BRCA: AUC 0.9905, AUPRC 0.9777
-SLN-BRCA: AUC 0.974, AUPRC 0.9148
+17-BRCA: AUC 0.9809, AUPRC 0.9552
+SLN-BRCA: AUC 0.9814, AUPRC 0.9512
 ```
 
 
