@@ -334,13 +334,6 @@ class Attn_Net_Gated_kan(nn.Module):
     def forward(self, x):
         a = self.attention_a(x)
         b = self.attention_b(x)
-        A = a * b
-        A = self.attention_c(A)
-        return A, x
-
-    def forward(self, x):
-        a = self.attention_a(x)
-        b = self.attention_b(x)
         A = a.mul(b)
         A = self.attention_c(A)
         return A, x
