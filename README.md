@@ -344,7 +344,7 @@ CUDA_VISIBLE_DEVICES=0 python3 train.py \
   --end 1
 ```
 
-**Linear**
+**No-KAN**
 ```shell
 CUDA_VISIBLE_DEVICES=0 python3 train.py \
   --config_path projects/configs/ablation/cfg_ablation_linear.yaml \
