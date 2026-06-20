@@ -50,25 +50,6 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Repository Structure
-
-```text
-LymphPath/
-├── train.py                         # training entry point
-├── eval.py                          # evaluation entry point
-├── checkpoints/                     # put downloaded or trained weights here
-├── csv/                             # dataset split csv files
-├── datasets/
-│   └── ThreeStreamBagDataset.py     # 3-stream MIL dataset loader
-├── models/stable_models/
-│   └── LymphPath.py                 # LymphPath model
-├── projects/configs/                # yaml configs for train / eval
-│   └── ablation/                    # ablation study configs
-├── training_methods/
-│   └── lymphpath.py                 # train / validation / evaluation
-└── utils/                           # config / dataloader / optimizer helpers
-    └── ablation.py                  # single-stream ablation helpers
-```
 
 ## Data Preparation
 
@@ -131,6 +112,131 @@ Put it to:
 ```text
 ./checkpoints/LymphPath.pt
 ```
+
+## Basic Usage: Lymph-Node Metastasis Detection with LymphPath
+
+1. Load the LymphPath model
+```python
+from utils.utils import read_yaml
+from utils.model_factory import load_model
+import torch
+
+cfg = read_yaml('projects/configs/cfg_LymphPath_17-BRCA.yaml')
+model = load_model(cfg)
+model.load_state_dict(torch.load('checkpoints/LymphPath.pt'), strict=True)
+```
+
+2. Lymph-Node Metastasis Detection
+```python
+import pandas as pd
+import random
+import torch.nn.functional as F
+from datasets.ThreeStreamBagDataset import ThreeChannelBagDataset
+
+random.seed(1)
+your_csv = pd.read_csv('csv/17-BRCA.csv')
+
+wsi_id = random.choice(list(your_csv['slide_id']))
+wsi_data = your_csv[your_csv['slide_id'] == wsi_id]
+
+data_dir1 = "./LymphPath_feature/17-BRCA/Gigapath/"
+data_dir2 = "./LymphPath_feature/17-BRCA/UNI/"
+data_dir3 = "./LymphPath_feature/17-BRCA/Virchow2/"
+
+dataset = ThreeChannelBagDataset(
+    df=wsi_data,
+    data_dir1=data_dir1,
+    data_dir2=data_dir2,
+    data_dir3=data_dir3,
+    label_field='label'
+)
+
+sample = dataset[0]
+model.eval()
+model.to('cuda')
+feature1 = sample['features1'].to('cuda')
+feature2 = sample['features2'].to('cuda')
+feature3 = sample['features3'].to('cuda')
+y = sample['label'].to('cuda')
+
+res = model(feature1, feature2, feature3, label=y, instance_eval=True)
+y_prob = torch.softmax(res['merge_logits'], dim=1)
+print('slide id:', str(wsi_id), 'if LNM:', int(y_prob[:, 1] > 0.5))
+```
+
+## Evaluation
+
+To reproduce the results in our paper, we provide reproducible evaluation on [17-BRCA](https://camelyon17.grand-challenge.org/Data/) and [SLN-BRCA](https://www.cancerimagingarchive.net/collection/sln-breast).
+
+### Step 1. Download processed frozen features
+
+- 17-BRCA features: [Google Drive](https://drive.google.com/drive/u/0/folders/1MTUuzkNtXHfa2OK09qRW_Fr4N6-MYOGZ)
+- SLN-BRCA features: [Google Drive](https://drive.google.com/drive/u/1/folders/1tIaBJNV1HXWPsAwWKNg25mdk7aifaA3s)
+
+Put them under:
+```text
+./LymphPath_feature/
+```
+
+### Step 2. Put the checkpoint in place
+
+```text
+./checkpoints/LymphPath.pt
+```
+
+### Step 3. Run evaluation
+
+```shell
+python3 eval.py --config_path projects/configs/cfg_LymphPath_17-BRCA.yaml
+python3 eval.py --config_path projects/configs/cfg_LymphPath_SLN-BRCA.yaml
+```
+
+If you want to evaluate your own trained checkpoint:
+```shell
+python3 eval.py \
+  --config_path projects/configs/cfg_LymphPath_17-BRCA.yaml \
+  --checkpoint ./projects/result/cfg_LymphPath_train.yaml_seed326/best_checkpoints/s_0_checkpoint.pt
+```
+
+### Step 4. Check results
+
+Metrics and predictions will be saved to:
+```text
+./projects/result/17-BRCA/
+./projects/result/SLN-BRCA/
+```
+
+Each folder contains:
+- `preds_0.csv`
+- `metrics.csv`
+
+Reference results:
+```text
+17-BRCA: AUC 0.9905, AUPRC 0.9777
+SLN-BRCA: AUC 0.974, AUPRC 0.9148
+```
+
+
+## Repository Structure
+
+```text
+LymphPath/
+├── train.py                         # training entry point
+├── eval.py                          # evaluation entry point
+├── checkpoints/                     # put downloaded or trained weights here
+├── csv/                             # dataset split csv files
+├── datasets/
+│   └── ThreeStreamBagDataset.py     # 3-stream MIL dataset loader
+├── models/stable_models/
+│   └── LymphPath.py                 # LymphPath model
+├── projects/configs/                # yaml configs for train / eval
+│   └── ablation/                    # ablation study configs
+├── training_methods/
+│   └── lymphpath.py                 # train / validation / evaluation
+└── utils/                           # config / dataloader / optimizer helpers
+    └── ablation.py                  # single-stream ablation helpers
+```
+
 
 ## Training
 
@@ -292,108 +398,6 @@ python3 eval.py \
   --checkpoint ./projects/result/cfg_ablation_linear.yaml_seed326/best_checkpoints/s_0_checkpoint.pt
 ```
 
-## Evaluation
-
-To reproduce the results in our paper, we provide reproducible evaluation on [17-BRCA](https://camelyon17.grand-challenge.org/Data/) and [SLN-BRCA](https://www.cancerimagingarchive.net/collection/sln-breast).
-
-### Step 1. Download processed frozen features
-
-- 17-BRCA features: [Google Drive](https://drive.google.com/drive/u/0/folders/1MTUuzkNtXHfa2OK09qRW_Fr4N6-MYOGZ)
-- SLN-BRCA features: [Google Drive](https://drive.google.com/drive/u/1/folders/1tIaBJNV1HXWPsAwWKNg25mdk7aifaA3s)
-
-Put them under:
-```text
-./LymphPath_feature/
-```
-
-### Step 2. Put the checkpoint in place
-
-```text
-./checkpoints/LymphPath.pt
-```
-
-### Step 3. Run evaluation
-
-```shell
-python3 eval.py --config_path projects/configs/cfg_LymphPath_17-BRCA.yaml
-python3 eval.py --config_path projects/configs/cfg_LymphPath_SLN-BRCA.yaml
-```
-
-If you want to evaluate your own trained checkpoint:
-```shell
-python3 eval.py \
-  --config_path projects/configs/cfg_LymphPath_17-BRCA.yaml \
-  --checkpoint ./projects/result/cfg_LymphPath_train.yaml_seed326/best_checkpoints/s_0_checkpoint.pt
-```
-
-### Step 4. Check results
-
-Metrics and predictions will be saved to:
-```text
-./projects/result/17-BRCA/
-./projects/result/SLN-BRCA/
-```
-
-Each folder contains:
-- `preds_0.csv`
-- `metrics.csv`
-
-Reference results:
-```text
-17-BRCA: AUC 0.9905, AUPRC 0.9777
-SLN-BRCA: AUC 0.974, AUPRC 0.9148
-```
-
-## Basic Usage: Lymph-Node Metastasis Detection with LymphPath
-
-1. Load the LymphPath model
-```python
-from utils.utils import read_yaml
-from utils.model_factory import load_model
-import torch
-
-cfg = read_yaml('projects/configs/cfg_LymphPath_17-BRCA.yaml')
-model = load_model(cfg)
-model.load_state_dict(torch.load('checkpoints/LymphPath.pt'), strict=True)
-```
-
-2. Lymph-Node Metastasis Detection
-```python
-import pandas as pd
-import random
-import torch.nn.functional as F
-from datasets.ThreeStreamBagDataset import ThreeChannelBagDataset
-
-random.seed(1)
-your_csv = pd.read_csv('csv/17-BRCA.csv')
-
-wsi_id = random.choice(list(your_csv['slide_id']))
-wsi_data = your_csv[your_csv['slide_id'] == wsi_id]
-
-data_dir1 = "./LymphPath_feature/17-BRCA/Gigapath/"
-data_dir2 = "./LymphPath_feature/17-BRCA/UNI/"
-data_dir3 = "./LymphPath_feature/17-BRCA/Virchow2/"
-
-dataset = ThreeChannelBagDataset(
-    df=wsi_data,
-    data_dir1=data_dir1,
-    data_dir2=data_dir2,
-    data_dir3=data_dir3,
-    label_field='label'
-)
-
-sample = dataset[0]
-model.eval()
-model.to('cuda')
-feature1 = sample['features1'].to('cuda')
-feature2 = sample['features2'].to('cuda')
-feature3 = sample['features3'].to('cuda')
-y = sample['label'].to('cuda')
-
-res = model(feature1, feature2, feature3, label=y, instance_eval=True)
-y_prob = torch.softmax(res['merge_logits'], dim=1)
-print('slide id:', str(wsi_id), 'if LNM:', int(y_prob[:, 1] > 0.5))
-```
 
 ## Acknowledgements
 
