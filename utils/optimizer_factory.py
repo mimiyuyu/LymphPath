@@ -5,7 +5,8 @@ def create_optimizer(model, cfg):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.Train.lr,
                                      weight_decay=cfg.Train.reg)
     elif cfg.Train.optimizer == 'AdamW':
-        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.Train.lr)
+        optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=cfg.Train.lr,
+                                     weight_decay=cfg.Train.reg)
     else:
         raise NotImplementedError
 
